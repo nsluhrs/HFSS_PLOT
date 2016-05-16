@@ -31,7 +31,7 @@ def getparam(colheader):
   return paramValue
 def getUnlabeled(datafile):
   return np.genfromtxt(os.getcwd()+datafile,skip_header=1,delimiter=',')
-def getLabeled(datafile):
+def getLabeled(datafile,physkeys=['ferrite_pos_z','Wb']):
   header=getheader(datafile)
   data=getUnlabeled(datafile).T
   cs,casenames=getcases(header)
@@ -48,8 +48,7 @@ def getLabeled(datafile):
   return labeled
 def getFreqs(datafile):
   return np.genfromtxt(os.getcwd()+datafile,skip_header=1,delimiter=',').T[0]
-def getcases(header):
-  physkeys=['ferrite_pos_z','Wb']
+def getcases(header,physkeys=['ferrite_pos_z','Wb']):
   phys=[]
   hs=[]
   physstrs=[]
@@ -72,20 +71,73 @@ def getcases(header):
       caseset.append((hs[n],hs[n+1]))
   return (caseset,list(physstrs))
 def getTPatFreq(dataset,freqindex):
-
   return dataset.T[freqindex].reshape((37,-1)).T
-
+def thermalLoss(ferrite):
+  s11=getUnlabeled(ferrites[ferrite]['S11']).T[1:]
+  radeff=getUnlabeled(ferrites[ferrite]['RAD_EFF']).T[1:]
+  labels=getheader(ferrites[ferrite]['RAD_EFF'])[1:]
+  mags1s=1-10**(s11/20.)
+  return (1-radeff.T)*mags1s.T
 if __name__=='__main__':
   
-  header=getheader(ferrites['CO2Z']['GAIN_3d'])
-  labeled=getLabeled(ferrites['CO2Z']['GAIN_3d'])
-  f=getFreqs(ferrites['CO2Z']['GAIN_3d'])
+  header=getheader(ferrites['NIZNMN']['GAIN_3d'])
+  labeled=getLabeled(ferrites['NIZNMN']['GAIN_3d'])
+  for fer in ferrites.keys():
+    plt.close('all')
+    f=getFreqs(ferrites[fer]['GAIN_3d'])
+    name=getheader(ferrites[fer]['RAD_EFF'])[1:]
+    name=['  - total length  400 mm 1 mm of ferrrite on bottom only','  - total length 1000 mm 1 mm of ferrrite on bottom only','  - total length  400 mm 1 mm of ferrrite both sides','  - total length 1000 mm 1 mm of ferrrite on both sides']
+    for q in range(len(thermalLoss(fer).T)):
+      plt.plot(f,100*thermalLoss(fer).T[q],label=name[q].split(' - ')[1])
+    plt.legend(loc=0)
+    plt.ylim(0,100)
+    plt.xlim(3,300)
+    plt.title(fer+'\n'+'Power to Heat')
+    s11=getUnlabeled(ferrites['NIZNMN']['S11']).T[1:]
+    radeff=getUnlabeled(ferrites[fer]['RAD_EFF']).T[1:]
+    plt.ylabel('% power to heat')
+    mng = plt.get_current_fig_manager()
+       
+    plt.show()
+    mng.window.showFullScreen()
+    plt.savefig(fer+'heat'+'.png')
+    plt.close('all')
+    for q in range(len(thermalLoss(fer).T)):
+      mags1s=1-10**(s11[q]/20.)
+      plt.plot(f,mags1s*100,label=name[q].split(' - ')[1])
+    plt.legend(loc=0)
+    
+    plt.ylabel('% power to antenna')
+    plt.title(fer+'\n'+'$S_{1,freespace}$')
+    mng = plt.get_current_fig_manager()
+    plt.ylim(0,100)
+    plt.xlim(3,300)
+    plt.show()
+    mng.window.showFullScreen()
+    plt.savefig(fer+'s11'+'.png')
+    plt.close('all')
+    for q in range(len(thermalLoss(fer).T)):
+      mags1s=1-10**(s11[q]/20.)
+      magpow=mags1s*radeff[q]
+      plt.plot(f,magpow*100,label=name[q].split(' - ')[1])
+    mng = plt.get_current_fig_manager()
+    plt.ylabel('% power radiated')
+    plt.ylim(0,100)
+    plt.xlim(3,300)
+    plt.title(fer+'\n'+'Radiated')
+    plt.legend(loc=0)
+    plt.show()
+    mng.window.showFullScreen()
+    plt.savefig(fer+'rad'+'.png')
+  plt.close('all')
+  '''
   for l in labeled.keys():
     c1=labeled[l]
+    
+    
     for n in range(21)+[]:
       plt.close('all')
-      r=getTPatFreq(c1[0],n)
-      r=r-np.min(r)
+      r=10**(getTPatFreq(c1[0],n)/20.)
       #r=np.array([[1]*37]*73)
       t=np.linspace(0,np.pi,37) 
       p=np.linspace(0,2*np.pi,73)
@@ -107,10 +159,11 @@ if __name__=='__main__':
       ax.set_title(str(f[n]))
       
       ax.plot_surface(X, Y, Z, rstride=1, cstride=1, facecolors=cm.jet(ed),shade=False)
-      ax.set
+      
       ax.set_xlabel(r'$\phi_\mathrm{real}$')
       ax.set_ylabel(r'$\phi_\mathrm{im}$')
       ax.set_zlabel(r'$V(\phi)$')
       sname=l.replace(':','=').replace(',','')
       plt.savefig('%.4d'%f[n]+('%.2f'%(f[n]-np.floor(f[n])))[1:]+sname+'.png',transparent=True)
       print '%.4d'%f[n]+('%.1f'%(f[n]-np.floor(f[n])))[1:]+sname+'.png'
+  '''
