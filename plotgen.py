@@ -35,14 +35,14 @@ def getLabeled(datafile,physkeys=['ferrite_pos_z','Wb']):
   header=getheader(datafile)
   data=getUnlabeled(datafile).T
   cs,casenames=getcases(header)
-  print cs
+  #print cs
   labeled={}
   for c in cs:
-    print casenames[ cs.index(c)]
+    #print casenames[ cs.index(c)]
     datalabels=[]
     for n in range(c[0],c[0]+len(data[c[0]:c[1]])):
       datalabels.append(getparam(header[n]))
-    print len(data[c[0]:c[1]])
+    #print len(data[c[0]:c[1]])
     labeled[casenames[ cs.index(c)]]=[data[c[0]:c[1]],datalabels]
     
   return labeled
@@ -75,13 +75,62 @@ def getTPatFreq(dataset,freqindex):
 def thermalLoss(ferrite):
   s11=getUnlabeled(ferrites[ferrite]['S11']).T[1:]
   radeff=getUnlabeled(ferrites[ferrite]['RAD_EFF']).T[1:]
-  labels=getheader(ferrites[ferrite]['RAD_EFF'])[1:]
+  
   mags1s=1-10**(s11/20.)
   return (1-radeff.T)*mags1s.T
+def getslice(data,plane):
+  if len(plane)!=2:raise ValueError('plane must be of form XY,YZ,XZ \n order does not matter')
+  uv=[]
+  for a in ['X','Y','Z']:uv+=[a in plane]
+  X,Y,Z=uv
+  inds=[]
+  if X and Y:
+    for n in xrange(len(data[1])):
+      d=data[1][n]
+      if d['Theta']=='90deg':
+        inds.append(n)
+    return inds
+  if X and Z:
+    for n in xrange(len(data[1])):
+      d=data[1][n]
+      if d['Phi']=='0deg' or d['Phi']=='180deg':
+        inds.append(n)
+    inds=inds[::2]+inds[-3::-2]
+    return inds
+  if Y and Z:
+    for n in xrange(len(data[1])):
+      d=data[1][n]
+      if d['Phi']=='90deg' or d['Phi']=='270deg':
+        inds.append(n)
+    inds=inds[::2]+inds[-3::-2]
+    return inds
+  
 if __name__=='__main__':
   
   header=getheader(ferrites['NIZNMN']['GAIN_3d'])
   labeled=getLabeled(ferrites['NIZNMN']['GAIN_3d'])
+  f=getFreqs(ferrites[fer]['GAIN_3d'])
+  for fer in ferrites.keys():
+    labeled=getLabeled(ferrites[fer]['GAIN_3d'])
+    for k in labeled.keys():
+      print k
+  labels=['XY','YZ','XZ']
+  datasets=[]
+  from matplotlib import cm
+
+  for label in labels:
+    datasets.append(np.array(labeled[k][0])[getslice(labeled[k],plane=label)])
+  plt.close('all')
+  pts=np.linspace(0,2*np.pi,73)
+  for n in range(15,21):plt.polar(pts,10**(datasets[0].T[n]/20),label=str(round(f[n],2))+' XY',color=cm.jet((n-15.)/5.))
+  for n in range(15,21):plt.polar(pts-np.pi/2,10**(datasets[2].T[n]/20),label=str(round(f[n],2))+' XZ',color=cm.jet((n-15.)/5.))
+  plt.legend(loc=0)  
+
+  
+  
+  
+      
+  '''
   for fer in ferrites.keys():
     plt.close('all')
     f=getFreqs(ferrites[fer]['GAIN_3d'])
@@ -89,6 +138,7 @@ if __name__=='__main__':
     name=['  - total length  400 mm 1 mm of ferrrite on bottom only','  - total length 1000 mm 1 mm of ferrrite on bottom only','  - total length  400 mm 1 mm of ferrrite both sides','  - total length 1000 mm 1 mm of ferrrite on both sides']
     for q in range(len(thermalLoss(fer).T)):
       plt.plot(f,100*thermalLoss(fer).T[q],label=name[q].split(' - ')[1])
+      np.savetxt(fer+name[q].split(' - ')[1]+'_heat_loss.csv',thermalLoss(fer).T[q],delimiter=',')
     plt.legend(loc=0)
     plt.ylim(0,100)
     plt.xlim(3,300)
@@ -104,6 +154,7 @@ if __name__=='__main__':
     plt.close('all')
     for q in range(len(thermalLoss(fer).T)):
       mags1s=1-10**(s11[q]/20.)
+      
       plt.plot(f,mags1s*100,label=name[q].split(' - ')[1])
     plt.legend(loc=0)
     
@@ -120,6 +171,7 @@ if __name__=='__main__':
       mags1s=1-10**(s11[q]/20.)
       magpow=mags1s*radeff[q]
       plt.plot(f,magpow*100,label=name[q].split(' - ')[1])
+      np.savetxt(fer+name[q].split(' - ')[1]+'_radiated.csv',magpow,delimiter=',')
     mng = plt.get_current_fig_manager()
     plt.ylabel('% power radiated')
     plt.ylim(0,100)
@@ -135,6 +187,7 @@ if __name__=='__main__':
     c1=labeled[l]
     
     
+  ''' 
     for n in range(21)+[]:
       plt.close('all')
       r=10**(getTPatFreq(c1[0],n)/20.)
